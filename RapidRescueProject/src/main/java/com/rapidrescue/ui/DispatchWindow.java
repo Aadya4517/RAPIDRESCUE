@@ -219,14 +219,14 @@ public class DispatchWindow extends Application {
             java.util.Collections.sort(sorted);
             int rank = 1;
             for (var pe : sorted) {
-                String sc = pe.getSeverityColor();
+                String sc = pe.sev_color();
                 HBox row = new HBox(12); row.setAlignment(Pos.CENTER_LEFT); row.setPadding(new Insets(12,16,12,16));
                 row.setStyle("-fx-background-color: #111118; -fx-border-color: "+sc+"; -fx-border-width: 0.5; -fx-border-radius: 10; -fx-background-radius: 10;");
                 Label rankLbl = new Label("#"+rank); rankLbl.setStyle("-fx-text-fill: "+sc+"; -fx-font-size: 18px; -fx-font-weight: bold; -fx-min-width: 30;");
                 Label sevLbl = new Label("SEV "+pe.severity); sevLbl.setStyle("-fx-background-color: "+sc+"22; -fx-border-color: "+sc+"; -fx-border-width: 0.5; -fx-border-radius: 8; -fx-background-radius: 8; -fx-text-fill: "+sc+"; -fx-font-size: 12px; -fx-font-weight: bold; -fx-padding: 4 10;");
                 Label typeLbl = new Label(capitalize(pe.type)+" - "+pe.subtype); typeLbl.setStyle("-fx-text-fill: #ccccee; -fx-font-size: 12px; -fx-font-weight: bold;");
-                Label locLbl = new Label("@ "+pe.location.name); locLbl.setStyle("-fx-text-fill: #6666aa; -fx-font-size: 11px;");
-                Label waitLbl = new Label("Waiting: "+pe.getWaitLabel()); waitLbl.setStyle("-fx-text-fill: #eab308; -fx-font-size: 10px;");
+                Label locLbl = new Label("@ "+pe.place.name); locLbl.setStyle("-fx-text-fill: #6666aa; -fx-font-size: 11px;");
+                Label waitLbl = new Label("Waiting: "+pe.wait_label()); waitLbl.setStyle("-fx-text-fill: #eab308; -fx-font-size: 10px;");
                 VBox info2 = new VBox(3, new HBox(8, typeLbl, sevLbl), locLbl, waitLbl); HBox.setHgrow(info2, Priority.ALWAYS);
                 Button cancelBtn = new Button("Cancel");
                 cancelBtn.setStyle("-fx-background-color: #1a1616; -fx-border-color: #cc3333; -fx-border-width: 0.5; -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: #ff6666; -fx-font-size: 10px; -fx-padding: 4 10; -fx-cursor: hand;");
@@ -252,19 +252,19 @@ public class DispatchWindow extends Application {
     void tryDispatchFromQueue() {
         if (pendingQueue.isEmpty()) return;
         com.rapidrescue.model.PendingEmergency pe = pendingQueue.peek();
-        java.util.List<DispatchedUnit> units = DispatchEngine.getUnitsForSeverity(pe.severity, pe.type, pe.location);
+        java.util.List<DispatchedUnit> units = DispatchEngine.get_units(pe.severity, pe.type, pe.place);
         if (units.isEmpty()) return; // still no units
         pendingQueue.poll(); // remove from queue
         // Auto-dispatch
         dispatchCounter++;
-        TrafficWeight traf = TrafficRouting.getTrafficWeight();
+        TrafficWeight traf = TrafficRouting.get_traffic();
         String timeStr = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("hh:mm a, d MMM"));
-        EmergencyRecord record = new EmergencyRecord(String.format("%03d", dispatchCounter), pe.type, pe.subtype, pe.severity, pe.location, new java.util.ArrayList<>(units), timeStr, traf.label);
+        EmergencyRecord record = new EmergencyRecord(String.format("%03d", dispatchCounter), pe.type, pe.subtype, pe.severity, pe.place, new java.util.ArrayList<>(units), timeStr, traf.label);
         emergencyLog.add(0, record);
-        DispatchEngine.markBusy(units);
+        DispatchEngine.set_busy(units);
         for (DispatchedUnit du : units) {
-            ResponderAlert alert = new ResponderAlert(0, String.format("%03d", dispatchCounter), du.unit.name, du.unit.icon, du.unit.type, pe.location.name, pe.type, pe.subtype, pe.severity, du.distKm, du.etaMin, timeStr);
-            AlertDatabase.insertAlert(alert);
+            ResponderAlert alert = new ResponderAlert(0, String.format("%03d", dispatchCounter), du.unit.name, du.unit.icon, du.unit.type, pe.place.name, pe.type, pe.subtype, pe.severity, du.dist_km, du.eta_min, timeStr);
+            AlertDatabase.save(alert);
             responderAlerts.add(0, alert);
         }
         Platform.runLater(() -> {
@@ -279,8 +279,8 @@ public class DispatchWindow extends Application {
         Timeline clock = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
             String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
             clockLabel.setText(time);
-            ShiftTracker.Shift shift = ShiftTracker.getCurrentShift();
-            shiftLabel.setText(shift.icon() + "  " + shift.name() + "  (" + shift.timeRange() + ")");
+            ShiftTracker.Shift shift = ShiftTracker.get_shift();
+            shiftLabel.setText(shift.icon() + "  " + shift.name() + "  (" + shift.time_range() + ")");
             shiftLabel.setStyle("-fx-text-fill: " + shift.color() + "; -fx-font-size: 11px;");
             // Update weather every 30 seconds
             if (LocalDateTime.now().getSecond() % 30 == 0) updateWeatherDisplay();
@@ -291,17 +291,17 @@ public class DispatchWindow extends Application {
     }
 
     void updateWeatherDisplay() {
-        WeatherEngine.WeatherCondition w = WeatherEngine.getCurrentWeather();
+        WeatherEngine.Weather w = WeatherEngine.get_weather();
         if (weatherLabel != null) {
             weatherLabel.setText(w.name());
             weatherLabel.setStyle("-fx-text-fill: " + w.color() + "; -fx-font-size: 11px; -fx-font-weight: bold;");
         }
         if (weatherImpactLabel != null) {
-            String impact = w.etaMultiplier() > 1.0
-                ? String.format("ETA x%.1f  |  %s", w.etaMultiplier(), WeatherEngine.getSeverityLabel(w.severity()))
+            String impact = w.eta_mult() > 1.0
+                ? String.format("ETA x%.1f  |  %s", w.eta_mult(), WeatherEngine.impact_label(w.impact()))
                 : "No ETA impact";
             weatherImpactLabel.setText(impact);
-            weatherImpactLabel.setStyle("-fx-text-fill: " + (w.severity() >= 2 ? "#ef4444" : w.severity() == 1 ? "#eab308" : "#22c55e") + "; -fx-font-size: 10px;");
+            weatherImpactLabel.setStyle("-fx-text-fill: " + (w.impact() >= 2 ? "#ef4444" : w.impact() == 1 ? "#eab308" : "#22c55e") + "; -fx-font-size: 10px;");
         }
         if (algoInfoLabel != null && selectedLoc != null) updateLocationInfo();
     }
@@ -336,7 +336,7 @@ public class DispatchWindow extends Application {
         clockLabel.setStyle("-fx-text-fill: #ccccee; -fx-font-size: 14px; -fx-font-weight: bold; -fx-font-family: monospace;");
 
         // Shift label
-        ShiftTracker.Shift shift = ShiftTracker.getCurrentShift();
+        ShiftTracker.Shift shift = ShiftTracker.get_shift();
         shiftLabel = new Label(shift.icon() + "  " + shift.name());
         shiftLabel.setStyle("-fx-text-fill: " + shift.color() + "; -fx-font-size: 11px;");
 
@@ -354,12 +354,12 @@ public class DispatchWindow extends Application {
         statusBox.setAlignment(Pos.CENTER);
 
         // Weather widget
-        WeatherEngine.WeatherCondition w = WeatherEngine.getCurrentWeather();
+        WeatherEngine.Weather w = WeatherEngine.get_weather();
         weatherLabel = new Label(w.name());
         weatherLabel.setStyle("-fx-text-fill: " + w.color() + "; -fx-font-size: 11px; -fx-font-weight: bold;");
-        weatherImpactLabel = new Label(w.etaMultiplier() > 1.0
-            ? String.format("ETA x%.1f", w.etaMultiplier()) : "No ETA impact");
-        weatherImpactLabel.setStyle("-fx-text-fill: " + (w.severity() >= 2 ? "#ef4444" : "#22c55e") + "; -fx-font-size: 10px;");
+        weatherImpactLabel = new Label(w.eta_mult() > 1.0
+            ? String.format("ETA x%.1f", w.eta_mult()) : "No ETA impact");
+        weatherImpactLabel.setStyle("-fx-text-fill: " + (w.impact() >= 2 ? "#ef4444" : "#22c55e") + "; -fx-font-size: 10px;");
         VBox weatherBox = new VBox(2, weatherLabel, weatherImpactLabel);
         weatherBox.setAlignment(Pos.CENTER_RIGHT);
         weatherBox.setPadding(new Insets(0, 8, 0, 8));
@@ -563,14 +563,14 @@ public class DispatchWindow extends Application {
                 for (var n : subTypeBox.getChildren()) if (n instanceof ToggleButton b) b.setStyle(subStyle(b.isSelected()));
                 selectedSubtype = s;
                 // Auto-set severity based on subtype
-                int autoSev = EmergencyDatabase.getAutoSeverity(s);
+                int autoSev = EmergencyDatabase.auto_sev(s);
                 applyAutoSeverity(autoSev);
                 updateSummaryChips();
             });
             subTypeBox.getChildren().add(tb);
         }
         // Auto-set severity for the initially selected subtype too
-        int autoSev = EmergencyDatabase.getAutoSeverity(selectedSubtype);
+        int autoSev = EmergencyDatabase.auto_sev(selectedSubtype);
         applyAutoSeverity(autoSev);
     }
 
@@ -659,14 +659,14 @@ public class DispatchWindow extends Application {
         if (selectedLoc == null) return;
         locNameLabel.setText(selectedLoc.name); locNameLabel.setStyle("-fx-text-fill: #22c55e; -fx-font-size: 11px;");
         locCoordsLabel.setText(String.format("%.4f N, %.4f E", selectedLoc.lat, selectedLoc.lng)); locCoordsLabel.setStyle("-fx-text-fill: #22c55e; -fx-font-size: 11px;");
-        TrafficWeight traf = TrafficRouting.getTrafficWeight();
-        WeatherEngine.WeatherCondition weather = WeatherEngine.getCurrentWeather();
+        TrafficWeight traf = TrafficRouting.get_traffic();
+        WeatherEngine.Weather weather = WeatherEngine.get_weather();
         trafficLabel.setText(traf.label); trafficBar.setProgress(traf.percent / 100.0);
-        double nearPol = EmergencyDatabase.POLICE.stream().mapToDouble(p -> GeoUtils.haversine(selectedLoc.lat, selectedLoc.lng, p.lat, p.lng)).min().orElse(0);
-        double eta = TrafficRouting.dijkstraETA(nearPol, traf.weight, weather.etaMultiplier());
+        double nearPol = EmergencyDatabase.POLICE.stream().mapToDouble(p -> GeoUtils.dist(selectedLoc.lat, selectedLoc.lng, p.lat, p.lng)).min().orElse(0);
+        double eta = TrafficRouting.calc_eta(nearPol, traf.weight, weather.eta_mult());
         algoInfoLabel.setText(String.format(
             "Haversine nearest police: %.2f km | Dijkstra ETA x%.1f traffic x%.1f weather = %.1f min | %s",
-            nearPol, traf.weight, weather.etaMultiplier(), eta, weather.name()));
+            nearPol, traf.weight, weather.eta_mult(), eta, weather.name()));
     }
 
     FlowPane buildUnitGrid() {
@@ -680,7 +680,7 @@ public class DispatchWindow extends Application {
         if (unitGrid == null) return;
         unitGrid.getChildren().clear();
         if (selectedLoc == null) { Label ph = new Label("\uD83D\uDCCD Select a location to compute nearest units"); ph.setStyle("-fx-text-fill: #3a3a6a; -fx-font-size: 12px;"); unitGrid.getChildren().add(ph); return; }
-        currentUnits = DispatchEngine.getUnitsForSeverity(selectedSev, selectedType, selectedLoc);
+        currentUnits = DispatchEngine.get_units(selectedSev, selectedType, selectedLoc);
         if (currentUnits.isEmpty()) { Label ph = new Label("No available units"); ph.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 12px;"); unitGrid.getChildren().add(ph); return; }
         for (DispatchedUnit du : currentUnits) {
             String color = unitColor(du.unit.type);
@@ -688,9 +688,9 @@ public class DispatchWindow extends Application {
             card.setStyle("-fx-background-color: #1a1a28; -fx-border-color: #2a2a3a; -fx-border-width: 0.5; -fx-border-radius: 8; -fx-background-radius: 8;");
             Label icon = new Label(du.unit.icon); icon.setStyle("-fx-font-size: 18px;");
             Label name = new Label(du.unit.name.split(",")[0].split("\\(")[0].trim()); name.setStyle("-fx-text-fill: #aaaacc; -fx-font-size: 10px; -fx-font-weight: bold;"); name.setWrapText(true); name.setTextAlignment(TextAlignment.CENTER);
-            Label dist = new Label(String.format("%.2f km", du.distKm)); dist.setStyle("-fx-text-fill: "+color+"; -fx-font-size: 10px;");
-            Label eta  = new Label(String.format("ETA %.1f min", du.etaMin)); eta.setStyle("-fx-background-color: "+color+"22; -fx-text-fill: "+color+"; -fx-font-size: 9px; -fx-padding: 2 6 2 6; -fx-background-radius: 10;");
-            Label avail = new Label(du.unit.available ? "\u2705 Available" : "\uD83D\uDD34 Busy"); avail.setStyle("-fx-text-fill: "+(du.unit.available?"#22c55e":"#ef4444")+"; -fx-font-size: 9px;");
+            Label dist = new Label(String.format("%.2f km", du.dist_km)); dist.setStyle("-fx-text-fill: "+color+"; -fx-font-size: 10px;");
+            Label eta  = new Label(String.format("ETA %.1f min", du.eta_min)); eta.setStyle("-fx-background-color: "+color+"22; -fx-text-fill: "+color+"; -fx-font-size: 9px; -fx-padding: 2 6 2 6; -fx-background-radius: 10;");
+            Label avail = new Label(du.unit.free ? "\u2705 Available" : "\uD83D\uDD34 Busy"); avail.setStyle("-fx-text-fill: "+(du.unit.free?"#22c55e":"#ef4444")+"; -fx-font-size: 9px;");
             card.getChildren().addAll(icon, name, dist, eta, avail);
             unitGrid.getChildren().add(card);
         }
@@ -743,20 +743,20 @@ public class DispatchWindow extends Application {
         playAlertSound();
 
         dispatchCounter++;
-        TrafficWeight traf = TrafficRouting.getTrafficWeight();
-        WeatherEngine.WeatherCondition weather = WeatherEngine.getCurrentWeather();
+        TrafficWeight traf = TrafficRouting.get_traffic();
+        WeatherEngine.Weather weather = WeatherEngine.get_weather();
         String timeStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("hh:mm a, d MMM"));
 
         EmergencyRecord record = new EmergencyRecord(String.format("%03d", dispatchCounter), selectedType, selectedSubtype, selectedSev, selectedLoc, new ArrayList<>(currentUnits), timeStr, traf.label);
         emergencyLog.add(0, record);
 
         // Mark units busy
-        DispatchEngine.markBusy(currentUnits);
+        DispatchEngine.set_busy(currentUnits);
 
         // Save to SQLite and in-memory alert list
         for (DispatchedUnit du : currentUnits) {
-            ResponderAlert alert = new ResponderAlert(0, String.format("%03d", dispatchCounter), du.unit.name, du.unit.icon, du.unit.type, selectedLoc.name, selectedType, selectedSubtype, selectedSev, du.distKm, du.etaMin, timeStr);
-            AlertDatabase.insertAlert(alert);
+            ResponderAlert alert = new ResponderAlert(0, String.format("%03d", dispatchCounter), du.unit.name, du.unit.icon, du.unit.type, selectedLoc.name, selectedType, selectedSubtype, selectedSev, du.dist_km, du.eta_min, timeStr);
+            AlertDatabase.save(alert);
             responderAlerts.add(0, alert);
         }
 
@@ -783,11 +783,11 @@ public class DispatchWindow extends Application {
         VBox titleBox = new VBox(3, titleLbl, subLbl2);
         HBox header = new HBox(12, iconLbl, titleBox); header.setAlignment(Pos.CENTER_LEFT);
 
-        Label algoBadge = new Label("Algorithms: Haversine + Dijkstra ETA x" + traf.weight + " traffic x" + String.format("%.1f", weather.etaMultiplier()) + " weather (" + weather.name() + ") + Greedy " + currentUnits.size() + " unit(s) Sev " + selectedSev);
+        Label algoBadge = new Label("Algorithms: Haversine + Dijkstra ETA x" + traf.weight + " traffic x" + String.format("%.1f", weather.eta_mult()) + " weather (" + weather.name() + ") + Greedy " + currentUnits.size() + " unit(s) Sev " + selectedSev);
         algoBadge.setStyle("-fx-background-color: #111128; -fx-border-color: #3344aa; -fx-border-width: 0.5; -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: #7788cc; -fx-font-size: 11px; -fx-padding: 8 12;");
         algoBadge.setWrapText(true);
-        String wCol = weather.severity() >= 2 ? "#ef4444" : weather.severity() == 1 ? "#eab308" : "#22c55e";
-        Label weatherBadge = new Label(weather.name() + "  |  " + weather.description() + (weather.etaMultiplier() > 1.0 ? "  |  ETA +" + String.format("%.0f%%", (weather.etaMultiplier()-1)*100) + " slower" : "  |  No ETA impact"));
+        String wCol = weather.impact() >= 2 ? "#ef4444" : weather.impact() == 1 ? "#eab308" : "#22c55e";
+        Label weatherBadge = new Label(weather.name() + "  |  " + weather.desc() + (weather.eta_mult() > 1.0 ? "  |  ETA +" + String.format("%.0f%%", (weather.eta_mult()-1)*100) + " slower" : "  |  No ETA impact"));
         weatherBadge.setWrapText(true);
         weatherBadge.setStyle("-fx-background-color: "+wCol+"11; -fx-border-color: "+wCol+"; -fx-border-width: 0.5; -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: "+wCol+"; -fx-font-size: 11px; -fx-padding: 8 12;");
 
@@ -800,7 +800,7 @@ public class DispatchWindow extends Application {
             String col = unitColor(du.unit.type);
             Label uIcon = new Label(du.unit.icon); uIcon.setStyle("-fx-font-size: 18px;");
             Label uName = new Label(du.unit.name); uName.setStyle("-fx-text-fill: #eeeeee; -fx-font-size: 12px; -fx-font-weight: bold;");
-            Label uDetail = new Label(String.format("%.2f km  \u00B7  ETA %.1f min", du.distKm, du.etaMin)); uDetail.setStyle("-fx-text-fill: "+col+"; -fx-font-size: 10px;");
+            Label uDetail = new Label(String.format("%.2f km  \u00B7  ETA %.1f min", du.dist_km, du.eta_min)); uDetail.setStyle("-fx-text-fill: "+col+"; -fx-font-size: 10px;");
             Label alertSent = new Label("\uD83D\uDD14 Alert sent to responder database"); alertSent.setStyle("-fx-text-fill: #eab308; -fx-font-size: 10px;");
             String origin = URLEncoder.encode(du.unit.name + ", Dehradun", StandardCharsets.UTF_8);
             String dest   = URLEncoder.encode(selectedLoc.name + ", Dehradun", StandardCharsets.UTF_8);
@@ -912,16 +912,16 @@ public class DispatchWindow extends Application {
         unitsStatusContainer.getChildren().add(grpLbl);
         for (com.rapidrescue.model.Unit u : units) {
             HBox row = new HBox(12); row.setAlignment(Pos.CENTER_LEFT); row.setPadding(new Insets(10,14,10,14));
-            String borderCol = u.getStatusColor();
+            String borderCol = u.status_color();
             row.setStyle("-fx-background-color: #111118; -fx-border-color: "+borderCol+"; -fx-border-width: 0.5; -fx-border-radius: 9; -fx-background-radius: 9;");
             Label icon = new Label(u.icon); icon.setStyle("-fx-font-size: 18px;");
             Label name = new Label(u.name); name.setStyle("-fx-text-fill: #ccccee; -fx-font-size: 12px; -fx-font-weight: bold;");
-            Label shiftLbl = new Label("Shift: " + u.getShiftLabel()); shiftLbl.setStyle("-fx-text-fill: #5555aa; -fx-font-size: 10px;");
+            Label shiftLbl = new Label("Shift: " + u.shift_label()); shiftLbl.setStyle("-fx-text-fill: #5555aa; -fx-font-size: 10px;");
             VBox info = new VBox(2, name, shiftLbl);
-            if (u.type.equals("hospital") && u.capacity > 0) {
-                int pct = u.getLoadPercent();
-                String loadCol = u.getLoadColor();
-                Label loadLbl = new Label(String.format("Load: %d/%d (%d%%) — %s", u.currentLoad, u.capacity, pct, u.getLoadLabel()));
+            if (u.type.equals("hospital") && u.max_beds > 0) {
+                int pct = u.load_pct();
+                String loadCol = u.load_color();
+                Label loadLbl = new Label(String.format("Load: %d/%d (%d%%) — %s", u.cur_load, u.max_beds, pct, u.load_label()));
                 loadLbl.setStyle("-fx-text-fill: "+loadCol+"; -fx-font-size: 10px;");
                 ProgressBar loadBar = new ProgressBar(pct / 100.0);
                 loadBar.setPrefWidth(140); loadBar.setPrefHeight(5);
@@ -929,12 +929,12 @@ public class DispatchWindow extends Application {
                 info.getChildren().addAll(loadLbl, loadBar);
             }
             HBox.setHgrow(info, Priority.ALWAYS);
-            Label statusLbl = new Label(u.getStatusLabel());
+            Label statusLbl = new Label(u.status_label());
             statusLbl.setStyle("-fx-background-color: "+borderCol+"22; -fx-border-color: "+borderCol+"; -fx-border-width: 0.5; -fx-border-radius: 10; -fx-background-radius: 10; -fx-text-fill: "+borderCol+"; -fx-font-size: 11px; -fx-padding: 4 10;");
             Button freeBtn = new Button("Mark Available");
             freeBtn.setStyle("-fx-background-color: #1a1a28; -fx-border-color: #3b82f6; -fx-border-width: 0.5; -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: #3b82f6; -fx-font-size: 10px; -fx-padding: 4 10; -fx-cursor: hand;");
-            freeBtn.setVisible(!u.available && u.isOnShift());
-            freeBtn.setOnAction(e -> { DispatchEngine.markAvailable(u.name); renderUnitsStatus(); refreshUnitGrid(); });
+            freeBtn.setVisible(!u.free && u.on_shift());
+            freeBtn.setOnAction(e -> { DispatchEngine.set_free(u.name); renderUnitsStatus(); refreshUnitGrid(); });
             row.getChildren().addAll(icon, info, statusLbl, freeBtn);
             unitsStatusContainer.getChildren().add(row);
         }
@@ -1018,10 +1018,10 @@ public class DispatchWindow extends Application {
             Label typeBadge = new Label(capitalize(r.type)); typeBadge.setStyle("-fx-background-color: "+tc[0]+"; -fx-border-color: "+tc[1]+"; -fx-border-width: 0.5; -fx-border-radius: 16; -fx-background-radius: 16; -fx-text-fill: "+tc[2]+"; -fx-font-size: 11px; -fx-padding: 3 10;");
             Label sevBadge = new Label("Sev "+r.severity); sevBadge.setStyle("-fx-background-color: "+sc+"22; -fx-border-color: "+sc+"80; -fx-border-width: 0.5; -fx-border-radius: 10; -fx-background-radius: 10; -fx-text-fill: "+sc+"; -fx-font-size: 11px; -fx-padding: 2 8;");
             Region sp = new Region(); HBox.setHgrow(sp, Priority.ALWAYS);
-            Label timeLbl = new Label(r.timestamp); timeLbl.setStyle("-fx-text-fill: #3a3a6a; -fx-font-size: 10px;");
+            Label timeLbl = new Label(r.time_str); timeLbl.setStyle("-fx-text-fill: #3a3a6a; -fx-font-size: 10px;");
             hdr.getChildren().addAll(idLbl, typeBadge, sevBadge, sp, timeLbl);
             HBox body = new HBox(8); body.setAlignment(Pos.CENTER_LEFT);
-            Label locLbl2 = new Label("\uD83D\uDCCD "+r.location.name); locLbl2.setStyle("-fx-text-fill: #aaaacc; -fx-font-size: 12px;");
+            Label locLbl2 = new Label("\uD83D\uDCCD "+r.place.name); locLbl2.setStyle("-fx-text-fill: #aaaacc; -fx-font-size: 12px;");
             Label subLbl3 = new Label(r.subtype); subLbl3.setStyle("-fx-text-fill: #6666aa; -fx-font-size: 11px;");
             Label uCount = new Label(r.units.size()+" unit"+(r.units.size()>1?"s":"")); uCount.setStyle("-fx-background-color: #1a1a28; -fx-text-fill: #7777aa; -fx-font-size: 11px; -fx-padding: 2 8; -fx-background-radius: 10;");
             body.getChildren().addAll(locLbl2, subLbl3, uCount);
@@ -1029,14 +1029,14 @@ public class DispatchWindow extends Application {
             for (DispatchedUnit du : r.units) {
                 String col = unitColor(du.unit.type);
                 String origin = URLEncoder.encode(du.unit.name+", Dehradun", StandardCharsets.UTF_8);
-                String dest   = URLEncoder.encode(r.location.name+", Dehradun", StandardCharsets.UTF_8);
+                String dest   = URLEncoder.encode(r.place.name+", Dehradun", StandardCharsets.UTF_8);
                 String mapsUrl = "https://www.google.com/maps/dir/?api=1&origin="+origin+"&destination="+dest;
                 Button pill = new Button(du.unit.icon+" "+du.unit.name.split(" ")[0]+" \u2197");
                 pill.setStyle("-fx-background-color: #1a1a28; -fx-border-color: "+col+"80; -fx-border-width: 0.5; -fx-border-radius: 6; -fx-background-radius: 6; -fx-text-fill: "+col+"; -fx-font-size: 10px; -fx-padding: 2 8; -fx-cursor: hand;");
                 pill.setOnAction(e -> { try { java.awt.Desktop.getDesktop().browse(new java.net.URI(mapsUrl)); } catch (Exception ex) { ex.printStackTrace(); } });
                 footer.getChildren().add(pill);
             }
-            Label trafLbl2 = new Label(r.trafficLabel); trafLbl2.setStyle("-fx-text-fill: #3a3a5a; -fx-font-size: 10px;");
+            Label trafLbl2 = new Label(r.traffic_label); trafLbl2.setStyle("-fx-text-fill: #3a3a5a; -fx-font-size: 10px;");
             footer.getChildren().add(trafLbl2);
             VBox card = new VBox(8, hdr, body, footer); card.setPadding(new Insets(14,16,14,16));
             card.setStyle("-fx-background-color: #111118; -fx-border-color: #2a2a3a; -fx-border-width: 0.5; -fx-border-radius: 11; -fx-background-radius: 11;");
@@ -1091,7 +1091,7 @@ public class DispatchWindow extends Application {
         alertContainer.getChildren().add(emptyLbl);
 
         // Load from DB on startup
-        List<ResponderAlert> dbAlerts = AlertDatabase.getAllAlerts();
+        List<ResponderAlert> dbAlerts = AlertDatabase.load_all();
         if (!dbAlerts.isEmpty()) { responderAlerts.addAll(dbAlerts); renderAlerts(); }
 
         view.getChildren().addAll(title, statsRow, howItWorks, alertContainer);
@@ -1107,24 +1107,24 @@ public class DispatchWindow extends Application {
                 alertContainer.getChildren().add(e); return;
             }
             for (ResponderAlert a : responderAlerts) {
-                String col = switch (a.unitType) { case "police" -> "#3b82f6"; case "hospital" -> "#22c55e"; case "fire" -> "#f97316"; default -> "#aaaacc"; };
-                String statusColor = a.getStatusColor();
+                String col = switch (a.unit_type) { case "police" -> "#3b82f6"; case "hospital" -> "#22c55e"; case "fire" -> "#f97316"; default -> "#aaaacc"; };
+                String statusColor = a.status_color();
 
                 HBox hdr = new HBox(8); hdr.setAlignment(Pos.CENTER_LEFT);
-                Label idLbl = new Label("Alert #"+a.id+" | Emergency #"+a.emergencyId); idLbl.setStyle("-fx-text-fill: #3a3a6a; -fx-font-size: 10px;");
-                Label statusBadge = new Label(a.getStatusLabel()); statusBadge.setStyle("-fx-background-color: "+statusColor+"22; -fx-border-color: "+statusColor+"; -fx-border-width: 0.5; -fx-border-radius: 10; -fx-background-radius: 10; -fx-text-fill: "+statusColor+"; -fx-font-size: 11px; -fx-padding: 3 10;");
+                Label idLbl = new Label("Alert #"+a.id+" | Emergency #"+a.emergency_id); idLbl.setStyle("-fx-text-fill: #3a3a6a; -fx-font-size: 10px;");
+                Label statusBadge = new Label(a.status_label()); statusBadge.setStyle("-fx-background-color: "+statusColor+"22; -fx-border-color: "+statusColor+"; -fx-border-width: 0.5; -fx-border-radius: 10; -fx-background-radius: 10; -fx-text-fill: "+statusColor+"; -fx-font-size: 11px; -fx-padding: 3 10;");
                 // ETA Countdown
-                Label countdownLbl = new Label(a.getCountdownLabel());
-                countdownLbl.setStyle("-fx-background-color: "+a.getCountdownColor()+"22; -fx-border-color: "+a.getCountdownColor()+"; -fx-border-width: 0.5; -fx-border-radius: 10; -fx-background-radius: 10; -fx-text-fill: "+a.getCountdownColor()+"; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 3 10; -fx-font-family: monospace;");
+                Label countdownLbl = new Label(a.countdown());
+                countdownLbl.setStyle("-fx-background-color: "+a.countdown_color()+"22; -fx-border-color: "+a.countdown_color()+"; -fx-border-width: 0.5; -fx-border-radius: 10; -fx-background-radius: 10; -fx-text-fill: "+a.countdown_color()+"; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 3 10; -fx-font-family: monospace;");
                 Region sp = new Region(); HBox.setHgrow(sp, Priority.ALWAYS);
-                Label timeLbl = new Label(a.dispatchedAt); timeLbl.setStyle("-fx-text-fill: #3a3a6a; -fx-font-size: 10px;");
+                Label timeLbl = new Label(a.sent_at); timeLbl.setStyle("-fx-text-fill: #3a3a6a; -fx-font-size: 10px;");
                 hdr.getChildren().addAll(idLbl, statusBadge, countdownLbl, sp, timeLbl);
 
                 HBox body = new HBox(10); body.setAlignment(Pos.CENTER_LEFT);
-                Label unitIcon = new Label(a.unitIcon); unitIcon.setStyle("-fx-font-size: 20px;");
-                Label unitName = new Label(a.unitName); unitName.setStyle("-fx-text-fill: #eeeeee; -fx-font-size: 13px; -fx-font-weight: bold;");
-                Label dest = new Label("\u2192 " + a.incidentLocation); dest.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 12px; -fx-font-weight: bold;");
-                Label detail = new Label(String.format("%.2f km  |  ETA %.1f min  |  %s - %s  |  Sev %d", a.distKm, a.etaMin, capitalize(a.emergencyType), a.emergencySubtype, a.severity)); detail.setStyle("-fx-text-fill: #6666aa; -fx-font-size: 10px;");
+                Label unitIcon = new Label(a.unit_icon); unitIcon.setStyle("-fx-font-size: 20px;");
+                Label unitName = new Label(a.unit_name); unitName.setStyle("-fx-text-fill: #eeeeee; -fx-font-size: 13px; -fx-font-weight: bold;");
+                Label dest = new Label("\u2192 " + a.place); dest.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 12px; -fx-font-weight: bold;");
+                Label detail = new Label(String.format("%.2f km  |  ETA %.1f min  |  %s - %s  |  Sev %d", a.dist_km, a.eta_min, capitalize(a.emg_type), a.emg_subtype, a.severity)); detail.setStyle("-fx-text-fill: #6666aa; -fx-font-size: 10px;");
                 VBox info = new VBox(3, new HBox(8, unitName, dest), detail); HBox.setHgrow(info, Priority.ALWAYS);
                 body.getChildren().addAll(unitIcon, info);
 
@@ -1133,17 +1133,17 @@ public class DispatchWindow extends Application {
                 if (a.status == ResponderAlert.Status.PENDING) {
                     Button ackBtn = new Button("\u2705 Acknowledge");
                     ackBtn.setStyle("-fx-background-color: #141e35; -fx-border-color: #3b82f6; -fx-border-width: 0.5; -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: #3b82f6; -fx-font-size: 11px; -fx-padding: 5 14; -fx-cursor: hand;");
-                    ackBtn.setOnAction(e -> { a.status = ResponderAlert.Status.ACKNOWLEDGED; AlertDatabase.updateStatus(a.id, a.status); renderAlerts(); updateAlertStats(); });
+                    ackBtn.setOnAction(e -> { a.status = ResponderAlert.Status.ACKNOWLEDGED; AlertDatabase.update_status(a.id, a.status); renderAlerts(); updateAlertStats(); });
                     actions.getChildren().add(ackBtn);
                 } else if (a.status == ResponderAlert.Status.ACKNOWLEDGED) {
                     Button enRouteBtn = new Button("\uD83D\uDE80 En Route");
                     enRouteBtn.setStyle("-fx-background-color: #1e1a14; -fx-border-color: #f97316; -fx-border-width: 0.5; -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: #f97316; -fx-font-size: 11px; -fx-padding: 5 14; -fx-cursor: hand;");
-                    enRouteBtn.setOnAction(e -> { a.status = ResponderAlert.Status.EN_ROUTE; AlertDatabase.updateStatus(a.id, a.status); renderAlerts(); updateAlertStats(); });
+                    enRouteBtn.setOnAction(e -> { a.status = ResponderAlert.Status.EN_ROUTE; AlertDatabase.update_status(a.id, a.status); renderAlerts(); updateAlertStats(); });
                     actions.getChildren().add(enRouteBtn);
                 } else if (a.status == ResponderAlert.Status.EN_ROUTE) {
                     Button arrivedBtn = new Button("\uD83D\uDCCD Arrived");
                     arrivedBtn.setStyle("-fx-background-color: #142214; -fx-border-color: #22c55e; -fx-border-width: 0.5; -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: #22c55e; -fx-font-size: 11px; -fx-padding: 5 14; -fx-cursor: hand;");
-                    arrivedBtn.setOnAction(e -> { a.status = ResponderAlert.Status.ARRIVED; AlertDatabase.updateStatus(a.id, a.status); DispatchEngine.markAvailable(a.unitName); renderAlerts(); updateAlertStats(); refreshUnitsStatusView(); refreshUnitGrid(); updateStatsCharts(); });
+                    arrivedBtn.setOnAction(e -> { a.status = ResponderAlert.Status.ARRIVED; AlertDatabase.update_status(a.id, a.status); DispatchEngine.set_free(a.unit_name); renderAlerts(); updateAlertStats(); refreshUnitsStatusView(); refreshUnitGrid(); updateStatsCharts(); });
                     actions.getChildren().add(arrivedBtn);
                 } else {
                     Label done = new Label("\uD83C\uDFC1 Mission Complete — Unit freed"); done.setStyle("-fx-text-fill: #22c55e; -fx-font-size: 11px;");

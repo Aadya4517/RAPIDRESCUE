@@ -3,97 +3,85 @@ package com.rapidrescue.logic;
 import java.time.LocalDateTime;
 import java.time.Month;
 
-/**
- * Simulates weather conditions for Dehradun based on time of day and season.
- * Applies a realistic ETA multiplier to account for road conditions.
- *
- * Dehradun climate:
- *  - Jun-Sep: Monsoon (heavy rain, fog)
- *  - Oct-Nov: Post-monsoon (mild, occasional fog)
- *  - Dec-Feb: Winter (fog, cold, occasional rain)
- *  - Mar-May: Summer (clear, hot, dust)
- */
+// Dehradun weather by season and hour
 public class WeatherEngine {
 
-    public record WeatherCondition(
+    // weather data record
+    public record Weather(
         String name,
         String icon,
         String color,
-        String description,
-        double etaMultiplier,
-        int    severity   // 0=fine, 1=minor, 2=moderate, 3=severe
+        String desc,
+        double eta_mult,  // ETA slowdown factor
+        int    impact     // 0=none 1=minor 2=moderate 3=severe
     ) {}
 
-    public static WeatherCondition getCurrentWeather() {
+    // get current weather condition
+    public static Weather get_weather() {
         LocalDateTime now = LocalDateTime.now();
-        int hour  = now.getHour();
-        Month mon = now.getMonth();
-        boolean isNight = hour < 6 || hour >= 20;
-        boolean isMonsoon   = mon == Month.JUNE || mon == Month.JULY || mon == Month.AUGUST || mon == Month.SEPTEMBER;
-        boolean isWinter    = mon == Month.DECEMBER || mon == Month.JANUARY || mon == Month.FEBRUARY;
-        boolean isSummer    = mon == Month.MARCH || mon == Month.APRIL || mon == Month.MAY;
-        boolean isPostMon   = mon == Month.OCTOBER || mon == Month.NOVEMBER;
+        int h   = now.getHour();
+        Month m = now.getMonth();
+        boolean night    = h < 6 || h >= 20;
+        boolean monsoon  = m == Month.JUNE || m == Month.JULY || m == Month.AUGUST || m == Month.SEPTEMBER;
+        boolean winter   = m == Month.DECEMBER || m == Month.JANUARY || m == Month.FEBRUARY;
+        boolean summer   = m == Month.MARCH || m == Month.APRIL || m == Month.MAY;
+        boolean post_mon = m == Month.OCTOBER || m == Month.NOVEMBER;
 
-        // Monsoon season
-        if (isMonsoon) {
-            if (hour >= 14 && hour <= 18) // afternoon thunderstorms
-                return new WeatherCondition("Heavy Rain", "RAIN", "#3b82f6",
-                    "Monsoon thunderstorm — roads flooded, visibility poor", 1.8, 3);
-            if (isNight)
-                return new WeatherCondition("Rain + Fog", "FOG", "#6b7280",
-                    "Night rain with fog — severely reduced visibility", 2.0, 3);
-            return new WeatherCondition("Moderate Rain", "RAIN", "#60a5fa",
-                "Monsoon rain — wet roads, reduced speed", 1.5, 2);
+        // monsoon Jun-Sep
+        if (monsoon) {
+            if (h >= 14 && h <= 18)
+                return new Weather("Heavy Rain", "RAIN", "#3b82f6",
+                    "Monsoon thunderstorm, roads flooded", 1.8, 3);
+            if (night)
+                return new Weather("Rain + Fog", "FOG", "#6b7280",
+                    "Night rain with fog, poor visibility", 2.0, 3);
+            return new Weather("Moderate Rain", "RAIN", "#60a5fa",
+                "Monsoon rain, wet roads", 1.5, 2);
         }
 
-        // Winter
-        if (isWinter) {
-            if (hour >= 5 && hour <= 9)
-                return new WeatherCondition("Dense Fog", "FOG", "#9ca3af",
-                    "Winter morning fog — near-zero visibility", 2.2, 3);
-            if (isNight)
-                return new WeatherCondition("Cold + Fog", "FOG", "#6b7280",
+        // winter Dec-Feb
+        if (winter) {
+            if (h >= 5 && h <= 9)
+                return new Weather("Dense Fog", "FOG", "#9ca3af",
+                    "Winter morning fog, near-zero visibility", 2.2, 3);
+            if (night)
+                return new Weather("Cold + Fog", "FOG", "#6b7280",
                     "Cold night with fog patches", 1.6, 2);
-            if (mon == Month.JANUARY && hour >= 10 && hour <= 15)
-                return new WeatherCondition("Light Rain", "RAIN", "#93c5fd",
-                    "Winter drizzle — slightly slippery roads", 1.3, 1);
-            return new WeatherCondition("Cold & Clear", "CLEAR", "#a5b4fc",
-                "Cold but clear — normal driving conditions", 1.1, 0);
+            if (m == Month.JANUARY && h >= 10 && h <= 15)
+                return new Weather("Light Rain", "RAIN", "#93c5fd",
+                    "Winter drizzle, slippery roads", 1.3, 1);
+            return new Weather("Cold & Clear", "CLEAR", "#a5b4fc",
+                "Cold but clear, normal driving", 1.1, 0);
         }
 
-        // Summer
-        if (isSummer) {
-            if (hour >= 12 && hour <= 16)
-                return new WeatherCondition("Heatwave", "HOT", "#f97316",
-                    "Extreme heat — tyre blowouts risk, engine stress", 1.2, 1);
-            if (hour >= 17 && hour <= 19 && mon == Month.MAY)
-                return new WeatherCondition("Dust Storm", "DUST", "#d97706",
-                    "Pre-monsoon dust storm — poor visibility", 1.7, 2);
-            return new WeatherCondition("Clear & Hot", "CLEAR", "#fbbf24",
-                "Clear skies — good driving conditions", 1.0, 0);
+        // summer Mar-May
+        if (summer) {
+            if (h >= 12 && h <= 16)
+                return new Weather("Heatwave", "HOT", "#f97316",
+                    "Extreme heat, engine stress", 1.2, 1);
+            if (h >= 17 && h <= 19 && m == Month.MAY)
+                return new Weather("Dust Storm", "DUST", "#d97706",
+                    "Pre-monsoon dust, poor visibility", 1.7, 2);
+            return new Weather("Clear & Hot", "CLEAR", "#fbbf24",
+                "Clear skies, good driving", 1.0, 0);
         }
 
-        // Post-monsoon
-        if (isPostMon) {
-            if (isNight)
-                return new WeatherCondition("Mild Fog", "FOG", "#9ca3af",
-                    "Post-monsoon night fog — moderate visibility", 1.3, 1);
-            return new WeatherCondition("Clear", "CLEAR", "#22c55e",
-                "Post-monsoon clear weather — excellent conditions", 1.0, 0);
+        // post-monsoon Oct-Nov
+        if (post_mon) {
+            if (night)
+                return new Weather("Mild Fog", "FOG", "#9ca3af",
+                    "Post-monsoon night fog", 1.3, 1);
+            return new Weather("Clear", "CLEAR", "#22c55e",
+                "Clear weather, excellent conditions", 1.0, 0);
         }
 
-        // Default: clear
-        return new WeatherCondition("Clear", "CLEAR", "#22c55e",
-            "Clear conditions — normal response times", 1.0, 0);
+        return new Weather("Clear", "CLEAR", "#22c55e",
+            "Clear, normal response times", 1.0, 0);
     }
 
-    /** Apply weather multiplier on top of traffic ETA */
-    public static double applyWeather(double trafficEta, WeatherCondition w) {
-        return trafficEta * w.etaMultiplier();
-    }
-
-    public static String getSeverityLabel(int sev) {
-        return switch (sev) {
+    // impact text
+    public static String impact_label(int level) {
+        return switch (level) {
             case 0 -> "No impact";
             case 1 -> "Minor impact";
             case 2 -> "Moderate impact";

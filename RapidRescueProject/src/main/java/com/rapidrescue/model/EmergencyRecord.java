@@ -2,24 +2,25 @@ package com.rapidrescue.model;
 
 import java.util.List;
 
+// one dispatched emergency
 public class EmergencyRecord {
     public String id, type, subtype;
-    public int severity;
-    public Location location;
+    public int    severity;
+    public Location  place;
     public List<DispatchedUnit> units;
-    public String timestamp;
-    public String trafficLabel;
+    public String time_str;
+    public String traffic_label;
 
     public EmergencyRecord(String id, String type, String subtype, int severity,
-                           Location location, List<DispatchedUnit> units,
-                           String timestamp, String trafficLabel) {
-        this.id = id; 
-        this.type = type; 
-        this.subtype = subtype;
-        this.severity = severity; 
-        this.location = location;
-        this.units = units; 
-        this.timestamp = timestamp;
-        this.trafficLabel = trafficLabel;
+                           Location place, List<DispatchedUnit> units,
+                           String time_str, String traffic_label) {
+        this.id            = id;
+        this.type          = type;
+        this.subtype       = subtype;
+        this.severity      = severity;
+        this.place         = place;
+        this.units         = units;
+        this.time_str      = time_str;
+        this.traffic_label = traffic_label;
     }
 }

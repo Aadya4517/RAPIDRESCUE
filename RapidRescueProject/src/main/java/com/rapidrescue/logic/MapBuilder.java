@@ -51,28 +51,28 @@ public class MapBuilder {
 
         // All unit background dots
         for (var u : EmergencyDatabase.POLICE) {
-            String col = !u.isOnShift() ? "#4b5563" : (u.available ? "#3b82f6" : "#1e3a5f");
-            String status = !u.isOnShift() ? "Off Shift" : (u.available ? "Available" : "Busy");
+            String col = !u.on_shift() ? "#4b5563" : (u.free ? "#3b82f6" : "#1e3a5f");
+            String status = !u.on_shift() ? "Off Shift" : (u.free ? "Available" : "Busy");
             js.append(String.format(
                 "L.circleMarker([%f,%f],{radius:5,color:'%s',fillColor:'%s',fillOpacity:0.85,weight:1.5})" +
                 ".addTo(map).bindPopup('<b>%s</b><br>Police<br><span style=color:%s>%s</span><br>Shift: %s');\n",
-                u.lat, u.lng, col, col, esc(u.name), col, status, u.getShiftLabel()));
+                u.lat, u.lng, col, col, esc(u.name), col, status, u.shift_label()));
         }
         for (var u : EmergencyDatabase.HOSPITALS) {
-            String col = !u.isOnShift() ? "#4b5563" : (u.available ? "#22c55e" : "#14532d");
-            String status = !u.isOnShift() ? "Off Shift" : (u.available ? "Available" : "Busy");
+            String col = !u.on_shift() ? "#4b5563" : (u.free ? "#22c55e" : "#14532d");
+            String status = !u.on_shift() ? "Off Shift" : (u.free ? "Available" : "Busy");
             js.append(String.format(
                 "L.circleMarker([%f,%f],{radius:5,color:'%s',fillColor:'%s',fillOpacity:0.85,weight:1.5})" +
                 ".addTo(map).bindPopup('<b>%s</b><br>Hospital<br><span style=color:%s>%s</span><br>Shift: %s');\n",
-                u.lat, u.lng, col, col, esc(u.name), col, status, u.getShiftLabel()));
+                u.lat, u.lng, col, col, esc(u.name), col, status, u.shift_label()));
         }
         for (var u : EmergencyDatabase.FIRE) {
-            String col = !u.isOnShift() ? "#4b5563" : (u.available ? "#f97316" : "#7c2d12");
-            String status = !u.isOnShift() ? "Off Shift" : (u.available ? "Available" : "Busy");
+            String col = !u.on_shift() ? "#4b5563" : (u.free ? "#f97316" : "#7c2d12");
+            String status = !u.on_shift() ? "Off Shift" : (u.free ? "Available" : "Busy");
             js.append(String.format(
                 "L.circleMarker([%f,%f],{radius:5,color:'%s',fillColor:'%s',fillOpacity:0.85,weight:1.5})" +
                 ".addTo(map).bindPopup('<b>%s</b><br>Fire<br><span style=color:%s>%s</span><br>Shift: %s');\n",
-                u.lat, u.lng, col, col, esc(u.name), col, status, u.getShiftLabel()));
+                u.lat, u.lng, col, col, esc(u.name), col, status, u.shift_label()));
         }
 
         // Incident marker
@@ -97,7 +97,7 @@ public class MapBuilder {
                 ".addTo(map).bindPopup('<b>%s</b><br>%.2f km | ETA %.1f min');\n" +
                 "L.polyline([[%f,%f],[%f,%f]],{color:'%s',weight:2.5,opacity:0.8,dashArray:'8,5'}).addTo(map);\n",
                 du.unit.lat, du.unit.lng, col, col,
-                esc(du.unit.name), du.distKm, du.etaMin,
+                esc(du.unit.name), du.dist_km, du.eta_min,
                 du.unit.lat, du.unit.lng, lat, lng, col));
         }
 

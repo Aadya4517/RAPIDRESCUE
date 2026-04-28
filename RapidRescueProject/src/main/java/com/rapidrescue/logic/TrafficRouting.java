@@ -3,26 +3,26 @@ package com.rapidrescue.logic;
 import com.rapidrescue.model.TrafficWeight;
 import java.time.LocalDateTime;
 
+// traffic and ETA calc
 public class TrafficRouting {
 
-    public static TrafficWeight getTrafficWeight() {
-        int hour = LocalDateTime.now().getHour();
-        if (hour >= 8  && hour <= 10) return new TrafficWeight(1.6, "Heavy (rush hour)", 80);
-        if (hour >= 17 && hour <= 19) return new TrafficWeight(1.5, "Heavy (evening)",   75);
-        if (hour >= 11 && hour <= 16) return new TrafficWeight(1.2, "Moderate",          55);
-        if (hour >= 20 && hour <= 22) return new TrafficWeight(1.1, "Light",             35);
+    // traffic level by hour
+    public static TrafficWeight get_traffic() {
+        int h = LocalDateTime.now().getHour();
+        if (h >= 8  && h <= 10) return new TrafficWeight(1.6, "Heavy (rush hour)", 80);
+        if (h >= 17 && h <= 19) return new TrafficWeight(1.5, "Heavy (evening)",   75);
+        if (h >= 11 && h <= 16) return new TrafficWeight(1.2, "Moderate",          55);
+        if (h >= 20 && h <= 22) return new TrafficWeight(1.1, "Light",             35);
         return new TrafficWeight(1.0, "Clear (night)", 15);
     }
 
-    /** Base ETA using traffic weight only */
-    public static double dijkstraETA(double distKm, double trafficWeight) {
-        double speedKmh = 40.0 / trafficWeight;
-        return (distKm / speedKmh) * 60.0;
+    // ETA with traffic only
+    public static double calc_eta(double dist_km, double traffic) {
+        return (dist_km / (40.0 / traffic)) * 60.0;
     }
 
-    /** ETA with both traffic and weather multipliers applied */
-    public static double dijkstraETA(double distKm, double trafficWeight, double weatherMultiplier) {
-        double speedKmh = 40.0 / trafficWeight;
-        return (distKm / speedKmh) * 60.0 * weatherMultiplier;
+    // ETA with traffic + weather
+    public static double calc_eta(double dist_km, double traffic, double weather) {
+        return (dist_km / (40.0 / traffic)) * 60.0 * weather;
     }
 }

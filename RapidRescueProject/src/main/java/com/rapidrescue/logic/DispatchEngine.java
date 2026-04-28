@@ -7,89 +7,92 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// picks and manages units for emergencies
 public class DispatchEngine {
 
-    public static List<DispatchedUnit> getUnitsForSeverity(int sev, String type, Location loc) {
-        TrafficWeight traf = TrafficRouting.getTrafficWeight();
-        WeatherEngine.WeatherCondition weather = WeatherEngine.getCurrentWeather();
-        double wm = weather.etaMultiplier();
+    // get best units for this emergency
+    public static List<DispatchedUnit> get_units(int sev, String type, Location loc) {
+        TrafficWeight traf    = TrafficRouting.get_traffic();
+        WeatherEngine.Weather wx = WeatherEngine.get_weather();
+        double wm = wx.eta_mult();
 
-        List<DispatchedUnit> pl = EmergencyDatabase.POLICE.stream()
-            .filter(u -> u.isDeployable())
-            .map(u -> { double d = GeoUtils.haversine(loc.lat,loc.lng,u.lat,u.lng); return new DispatchedUnit(u,d,TrafficRouting.dijkstraETA(d,traf.weight,wm)); })
-            .sorted(Comparator.comparingDouble(du -> du.distKm)).collect(Collectors.toList());
+        // sort each group by distance, ready units only
+        List<DispatchedUnit> police = EmergencyDatabase.POLICE.stream()
+            .filter(u -> u.ready())
+            .map(u -> { double d = GeoUtils.dist(loc.lat,loc.lng,u.lat,u.lng); return new DispatchedUnit(u,d,TrafficRouting.calc_eta(d,traf.weight,wm)); })
+            .sorted(Comparator.comparingDouble(du -> du.dist_km)).collect(Collectors.toList());
 
-        List<DispatchedUnit> hl = EmergencyDatabase.HOSPITALS.stream()
-            .filter(u -> u.isDeployable())
-            .map(u -> { double d = GeoUtils.haversine(loc.lat,loc.lng,u.lat,u.lng); return new DispatchedUnit(u,d,TrafficRouting.dijkstraETA(d,traf.weight,wm)); })
-            .sorted(Comparator.comparingDouble(du -> du.distKm)).collect(Collectors.toList());
+        List<DispatchedUnit> hosp = EmergencyDatabase.HOSPITALS.stream()
+            .filter(u -> u.ready())
+            .map(u -> { double d = GeoUtils.dist(loc.lat,loc.lng,u.lat,u.lng); return new DispatchedUnit(u,d,TrafficRouting.calc_eta(d,traf.weight,wm)); })
+            .sorted(Comparator.comparingDouble(du -> du.dist_km)).collect(Collectors.toList());
 
-        List<DispatchedUnit> fl = EmergencyDatabase.FIRE.stream()
-            .filter(u -> u.isDeployable())
-            .map(u -> { double d = GeoUtils.haversine(loc.lat,loc.lng,u.lat,u.lng); return new DispatchedUnit(u,d,TrafficRouting.dijkstraETA(d,traf.weight,wm)); })
-            .sorted(Comparator.comparingDouble(du -> du.distKm)).collect(Collectors.toList());
+        List<DispatchedUnit> fire = EmergencyDatabase.FIRE.stream()
+            .filter(u -> u.ready())
+            .map(u -> { double d = GeoUtils.dist(loc.lat,loc.lng,u.lat,u.lng); return new DispatchedUnit(u,d,TrafficRouting.calc_eta(d,traf.weight,wm)); })
+            .sorted(Comparator.comparingDouble(du -> du.dist_km)).collect(Collectors.toList());
 
-        List<DispatchedUnit> result = new ArrayList<>();
+        List<DispatchedUnit> out = new ArrayList<>();
+        // greedy allocation by type and severity
         switch (type) {
             case "crime":
-                safeAdd(result,pl,0);
-                if (sev>=4) safeAdd(result,pl,1);
-                if (sev>=4) safeAdd(result,hl,0);
-                if (sev==5) { safeAdd(result,hl,1); safeAdd(result,pl,2); }
+                add(out,police,0);
+                if (sev>=4) add(out,police,1);
+                if (sev>=4) add(out,hosp,0);
+                if (sev==5) { add(out,hosp,1); add(out,police,2); }
                 break;
             case "fire":
-                safeAdd(result,fl,0);
-                if (sev>=3) safeAdd(result,fl,1);
-                if (sev>=4) { safeAdd(result,hl,0); safeAdd(result,pl,0); }
-                if (sev==5) safeAdd(result,fl,2);
+                add(out,fire,0);
+                if (sev>=3) add(out,fire,1);
+                if (sev>=4) { add(out,hosp,0); add(out,police,0); }
+                if (sev==5) add(out,fire,2);
                 break;
             case "accident":
-                safeAdd(result,hl,0);
-                safeAdd(result,pl,0);
-                if (sev>=3) safeAdd(result,hl,1);
-                if (sev>=4) safeAdd(result,fl,0);
-                if (sev==5) safeAdd(result,pl,1);
+                add(out,hosp,0);
+                add(out,police,0);
+                if (sev>=3) add(out,hosp,1);
+                if (sev>=4) add(out,fire,0);
+                if (sev==5) add(out,police,1);
                 break;
             case "medical":
-                safeAdd(result,hl,0);
-                if (sev>=3) safeAdd(result,hl,1);
-                if (sev>=4) safeAdd(result,pl,0);
-                if (sev==5) safeAdd(result,hl,2);
+                add(out,hosp,0);
+                if (sev>=3) add(out,hosp,1);
+                if (sev>=4) add(out,police,0);
+                if (sev==5) add(out,hosp,2);
                 break;
         }
-        return result;
+        return out;
     }
 
-    /** Mark dispatched units as busy and increase hospital load */
-    public static void markBusy(List<DispatchedUnit> units) {
+    // mark units busy, increase hospital load
+    public static void set_busy(List<DispatchedUnit> units) {
         for (DispatchedUnit du : units) {
-            du.unit.available = false;
-            if (du.unit.type.equals("hospital") && du.unit.capacity > 0) {
-                du.unit.currentLoad = Math.min(du.unit.capacity, du.unit.currentLoad + 1);
-            }
+            du.unit.free = false;
+            if (du.unit.type.equals("hospital") && du.unit.max_beds > 0)
+                du.unit.cur_load = Math.min(du.unit.max_beds, du.unit.cur_load + 1);
         }
     }
 
-    /** Mark a unit as available again and decrease hospital load */
-    public static void markAvailable(String unitName) {
-        setAvailability(unitName, true);
+    // free a unit by name, decrease hospital load
+    public static void set_free(String name) {
+        find_and_set(name, true);
     }
 
-    private static void setAvailability(String unitName, boolean available) {
-        EmergencyDatabase.POLICE.stream().filter(u -> u.name.equals(unitName)).findFirst()
-            .ifPresent(u -> u.available = available);
-        EmergencyDatabase.HOSPITALS.stream().filter(u -> u.name.equals(unitName)).findFirst()
+    private static void find_and_set(String name, boolean free) {
+        EmergencyDatabase.POLICE.stream().filter(u -> u.name.equals(name)).findFirst()
+            .ifPresent(u -> u.free = free);
+        EmergencyDatabase.HOSPITALS.stream().filter(u -> u.name.equals(name)).findFirst()
             .ifPresent(u -> {
-                u.available = available;
-                if (available && u.capacity > 0) {
-                    u.currentLoad = Math.max(0, u.currentLoad - 1);
-                }
+                u.free = free;
+                if (free && u.max_beds > 0)
+                    u.cur_load = Math.max(0, u.cur_load - 1);
             });
-        EmergencyDatabase.FIRE.stream().filter(u -> u.name.equals(unitName)).findFirst()
-            .ifPresent(u -> u.available = available);
+        EmergencyDatabase.FIRE.stream().filter(u -> u.name.equals(name)).findFirst()
+            .ifPresent(u -> u.free = free);
     }
 
-    private static void safeAdd(List<DispatchedUnit> result, List<DispatchedUnit> src, int idx) {
-        if (idx < src.size()) result.add(src.get(idx));
+    // safe list add by index
+    private static void add(List<DispatchedUnit> out, List<DispatchedUnit> src, int i) {
+        if (i < src.size()) out.add(src.get(i));
     }
 }

@@ -25,9 +25,9 @@ public class StatsBuilder {
     public static String buildStatsHtml(List<EmergencyRecord> log, List<ResponderAlert> alerts) {
         int total = log.size();
         long critical = log.stream().filter(r -> r.severity >= 4).count();
-        double avgEta = alerts.stream().mapToDouble(a -> a.etaMin).average().orElse(0);
+        double avgEta = alerts.stream().mapToDouble(a -> a.eta_min).average().orElse(0);
         String busiest = log.stream()
-            .collect(Collectors.groupingBy(r -> r.location.name, Collectors.counting()))
+            .collect(Collectors.groupingBy(r -> r.place.name, Collectors.counting()))
             .entrySet().stream().max(Map.Entry.comparingByValue())
             .map(Map.Entry::getKey).orElse("-");
         long arrived = alerts.stream().filter(a -> a.status == ResponderAlert.Status.ARRIVED).count();
@@ -44,14 +44,14 @@ public class StatsBuilder {
         for (EmergencyRecord r : log) {
             try {
                 java.time.LocalTime lt = java.time.LocalTime.parse(
-                    r.timestamp.split(",")[0].trim(), DateTimeFormatter.ofPattern("hh:mm a"));
+                    r.time_str.split(",")[0].trim(), DateTimeFormatter.ofPattern("hh:mm a"));
                 hour[lt.getHour()]++;
             } catch (Exception ignored) {}
         }
 
-        long policeA   = alerts.stream().filter(a -> a.unitType.equals("police")).count();
-        long hospitalA = alerts.stream().filter(a -> a.unitType.equals("hospital")).count();
-        long fireA     = alerts.stream().filter(a -> a.unitType.equals("fire")).count();
+        long policeA   = alerts.stream().filter(a -> a.unit_type.equals("police")).count();
+        long hospitalA = alerts.stream().filter(a -> a.unit_type.equals("hospital")).count();
+        long fireA     = alerts.stream().filter(a -> a.unit_type.equals("fire")).count();
 
         String[] types = {"crime","fire","accident","medical"};
         String[] cols  = {"#ee88cc","#ffaa55","#7799ee","#44cc88"};
@@ -60,7 +60,7 @@ public class StatsBuilder {
             String t = types[i]; String c = cols[i];
             List<EmergencyRecord> sub = log.stream().filter(r -> r.type.equals(t)).collect(Collectors.toList());
             int cnt = sub.size();
-            double eta = alerts.stream().filter(a -> a.emergencyType.equals(t)).mapToDouble(a -> a.etaMin).average().orElse(0);
+            double eta = alerts.stream().filter(a -> a.emg_type.equals(t)).mapToDouble(a -> a.eta_min).average().orElse(0);
             double avgSev = sub.stream().mapToInt(r -> r.severity).average().orElse(0);
             long crit = sub.stream().filter(r -> r.severity >= 4).count();
             double critPct = cnt > 0 ? (crit * 100.0 / cnt) : 0;
@@ -83,8 +83,8 @@ public class StatsBuilder {
         // Hospital load data
         StringBuilder hospRows = new StringBuilder();
         for (var h : com.rapidrescue.data.EmergencyDatabase.HOSPITALS) {
-            int pct = h.getLoadPercent();
-            String col = h.getLoadColor();
+            int pct = h.load_pct();
+            String col = h.load_color();
             String barStyle = "background:linear-gradient(to right," + col + " " + pct + "%,#1a1a28 " + pct + "%)";
             hospRows.append(String.format(
                 "<tr><td style='color:#ccccee;font-weight:600'>%s</td>" +
@@ -93,20 +93,20 @@ public class StatsBuilder {
                 "<td style='color:%s;font-weight:700'>%d%%</td>" +
                 "<td style='color:%s'>%s</td>" +
                 "<td style='color:%s'>%s</td></tr>",
-                h.name, h.currentLoad, h.capacity, barStyle,
-                col, pct, col, h.getLoadLabel(),
-                h.getStatusColor(), h.getStatusLabel()));
+                h.name, h.cur_load, h.max_beds, barStyle,
+                col, pct, col, h.load_label(),
+                h.status_color(), h.status_label()));
         }
 
         // Weather info
-        WeatherEngine.WeatherCondition wx = WeatherEngine.getCurrentWeather();
-        String wxColor = wx.severity() >= 2 ? "#ef4444" : wx.severity() == 1 ? "#eab308" : "#22c55e";
+        WeatherEngine.Weather wx = WeatherEngine.get_weather();
+        String wxColor = wx.impact() >= 2 ? "#ef4444" : wx.impact() == 1 ? "#eab308" : "#22c55e";
         String wxHtml = "<div style='background:#111118;border:0.5px solid " + wxColor + ";border-radius:12px;padding:14px;margin-bottom:14px;'>" +
             "<h3 style='font-size:10px;color:#7777bb;margin-bottom:10px;font-weight:700;letter-spacing:0.8px;'>CURRENT WEATHER CONDITIONS</h3>" +
             "<div style='display:flex;gap:20px;align-items:center;flex-wrap:wrap;'>" +
             "<div style='font-size:22px;font-weight:800;color:" + wxColor + "'>" + wx.name() + "</div>" +
-            "<div><div style='color:#ccccee;font-size:12px'>" + wx.description() + "</div>" +
-            "<div style='color:" + wxColor + ";font-size:11px;margin-top:4px'>ETA Multiplier: x" + String.format("%.1f", wx.etaMultiplier()) + "  |  " + WeatherEngine.getSeverityLabel(wx.severity()) + "</div></div>" +
+            "<div><div style='color:#ccccee;font-size:12px'>" + wx.desc() + "</div>" +
+            "<div style='color:" + wxColor + ";font-size:11px;margin-top:4px'>ETA Multiplier: x" + String.format("%.1f", wx.eta_mult()) + "  |  " + WeatherEngine.impact_label(wx.impact()) + "</div></div>" +
             "</div></div>";
 
         return "<!DOCTYPE html><html><head><meta charset='utf-8'/><style>" +
