@@ -14,11 +14,17 @@ public class StatsBuilder {
 
     private static String chartJs = null;
 
-    private static String getChartJs() {
-        if (chartJs == null) {
-            try { chartJs = Files.readString(Paths.get("RapidRescueProject/lib/chart.min.js")); }
-            catch (IOException e) { chartJs = ""; System.err.println("[StatsBuilder] chart.min.js not found"); }
+    // try multiple base dirs to find chart.min.js
+    private static String load_chart() {
+        String[] bases = {System.getProperty("user.dir"), System.getProperty("user.dir")+"/RapidRescueProject", "RapidRescueProject", "."};
+        for (String b : bases) {
+            try { java.nio.file.Path p = Paths.get(b,"lib/chart.min.js"); if (p.toFile().exists()) return Files.readString(p); } catch (IOException ignored) {}
         }
+        System.err.println("[Stats] chart.min.js not found"); return "";
+    }
+
+    private static String getChartJs() {
+        if (chartJs == null) chartJs = load_chart();
         return chartJs;
     }
 

@@ -1,4 +1,5 @@
-package com.rapidrescue.logic;
+﻿f = open("RapidRescueProject/src/main/java/com/rapidrescue/logic/MapBuilder.java","w",encoding="utf-8")
+f.write("""package com.rapidrescue.logic;
 
 import com.rapidrescue.model.DispatchedUnit;
 import com.rapidrescue.model.Location;
@@ -56,7 +57,7 @@ public class MapBuilder {
             String st  = !u.on_shift() ? "Off Shift" : (u.free ? "Available" : "Busy");
             mk.append(String.format(
                 "L.circleMarker([%f,%f],{radius:5,color:'%s',fillColor:'%s',fillOpacity:0.85,weight:1.5})" +
-                ".addTo(map).bindPopup('<b>%s</b><br>Police | <span style=color:%s>%s</span><br>Shift: %s');\n",
+                ".addTo(map).bindPopup('<b>%s</b><br>Police | <span style=color:%s>%s</span><br>Shift: %s');\\n",
                 u.lat,u.lng,col,col,esc(u.name),col,st,u.shift_label()));
         }
         for (var u : EmergencyDatabase.HOSPITALS) {
@@ -65,7 +66,7 @@ public class MapBuilder {
             String load = u.max_beds > 0 ? " | Load: " + u.load_pct() + "%" : "";
             mk.append(String.format(
                 "L.circleMarker([%f,%f],{radius:5,color:'%s',fillColor:'%s',fillOpacity:0.85,weight:1.5})" +
-                ".addTo(map).bindPopup('<b>%s</b><br>Hospital | <span style=color:%s>%s</span>%s<br>Shift: %s');\n",
+                ".addTo(map).bindPopup('<b>%s</b><br>Hospital | <span style=color:%s>%s</span>%s<br>Shift: %s');\\n",
                 u.lat,u.lng,col,col,esc(u.name),col,st,load,u.shift_label()));
         }
         for (var u : EmergencyDatabase.FIRE) {
@@ -73,16 +74,16 @@ public class MapBuilder {
             String st  = !u.on_shift() ? "Off Shift" : (u.free ? "Available" : "Busy");
             mk.append(String.format(
                 "L.circleMarker([%f,%f],{radius:5,color:'%s',fillColor:'%s',fillOpacity:0.85,weight:1.5})" +
-                ".addTo(map).bindPopup('<b>%s</b><br>Fire | <span style=color:%s>%s</span><br>Shift: %s');\n",
+                ".addTo(map).bindPopup('<b>%s</b><br>Fire | <span style=color:%s>%s</span><br>Shift: %s');\\n",
                 u.lat,u.lng,col,col,esc(u.name),col,st,u.shift_label()));
         }
 
         // incident marker
         if (incident != null) {
             mk.append(String.format(
-                "L.circleMarker([%f,%f],{radius:14,color:'#ef4444',fillColor:'#ef4444',fillOpacity:0.15,weight:3}).addTo(map);\n" +
+                "L.circleMarker([%f,%f],{radius:14,color:'#ef4444',fillColor:'#ef4444',fillOpacity:0.15,weight:3}).addTo(map);\\n" +
                 "L.circleMarker([%f,%f],{radius:7,color:'#ef4444',fillColor:'#ef4444',fillOpacity:1,weight:2})" +
-                ".addTo(map).bindPopup('<b>INCIDENT</b><br>%s').openPopup();\n",
+                ".addTo(map).bindPopup('<b>INCIDENT</b><br>%s').openPopup();\\n",
                 lat,lng,lat,lng,esc(incident.name)));
         }
 
@@ -96,8 +97,8 @@ public class MapBuilder {
             };
             mk.append(String.format(
                 "L.circleMarker([%f,%f],{radius:10,color:'%s',fillColor:'%s',fillOpacity:0.95,weight:2.5})" +
-                ".addTo(map).bindPopup('<b>%s</b><br>%.2f km | ETA %.1f min');\n" +
-                "L.polyline([[%f,%f],[%f,%f]],{color:'%s',weight:2.5,opacity:0.8,dashArray:'8,5'}).addTo(map);\n",
+                ".addTo(map).bindPopup('<b>%s</b><br>%.2f km | ETA %.1f min');\\n" +
+                "L.polyline([[%f,%f],[%f,%f]],{color:'%s',weight:2.5,opacity:0.8,dashArray:'8,5'}).addTo(map);\\n",
                 du.unit.lat,du.unit.lng,col,col,
                 esc(du.unit.name),du.dist_km,du.eta_min,
                 du.unit.lat,du.unit.lng,lat,lng,col));
@@ -113,12 +114,12 @@ public class MapBuilder {
         mk.append("<span style=color:#4ade80>&#9679;</span> Hospital<br>");
         mk.append("<span style=color:#fb923c>&#9679;</span> Fire<br>");
         mk.append("<span style=color:#4b5563>&#9679;</span> Off Shift';");
-        mk.append("return d;};lg.addTo(map);\n");
+        mk.append("return d;};lg.addTo(map);\\n");
 
         String leaflet_loaded = js();
         boolean has_js = !leaflet_loaded.isEmpty();
 
-        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>" +
+        return "<!DOCTYPE html><html><head><meta charset=\\"utf-8\\"/>" +
             "<style>" + css() + "</style>" +
             "<style>html,body,#map{margin:0;padding:0;width:100%;height:100%;background:#0d1117;}" +
             ".leaflet-popup-content-wrapper{background:#1a1a28;color:#ccccee;border:1px solid #3a3a5a;border-radius:8px;font-size:12px;}" +
@@ -126,9 +127,9 @@ public class MapBuilder {
             ".leaflet-tile-pane{filter:brightness(0.8) saturate(0.6) hue-rotate(195deg);}" +
             ".leaflet-control-attribution{background:#1a1a28!important;color:#555!important;}</style>" +
             (has_js ? "<script>" + leaflet_loaded + "</script>" :
-             "<link rel=\"stylesheet\" href=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.css\"/>" +
-             "<script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\"></script>") +
-            "</head><body><div id=\"map\"></div><script>" +
+             "<link rel=\\"stylesheet\\" href=\\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.css\\"/>" +
+             "<script src=\\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\\"></script>") +
+            "</head><body><div id=\\"map\\"></div><script>" +
             "var map=L.map('map',{center:[" + lat + "," + lng + "],zoom:13,preferCanvas:true});" +
             "L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap',maxZoom:19}).addTo(map);" +
             mk.toString() +
@@ -140,6 +141,9 @@ public class MapBuilder {
     private static String esc(String s) {
         if (s == null) return "";
         return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-                .replace("\"","&quot;").replace("'","&#39;");
+                .replace("\\"","&quot;").replace("'","&#39;");
     }
 }
+""")
+f.close()
+print("MapBuilder done")
